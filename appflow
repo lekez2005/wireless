@@ -1,0 +1,35 @@
+
+there is a main devices dictionary containing database objects
+
+Each database object has an identifier unique within its device type
+identifier can be a user defined string or just the xbee address etc
+
+devices = {"detector":[{smoke}, {window1}, {window2}],
+            "door":[{back_door}],
+            "door_rfid":[{front_door}, {front_door2},
+            "door_pinpad":[{front_door}],
+            "generic_xbee": [{xbee1}, {xbee2}]
+
+
+Each message received by server via, http, xbee, bluetooth?, contains
+    - device_type
+    - device identifier (unique within device_type
+    - active (whether the device is active or not
+    - only one object exists in memory and database for each device
+
+- On receipt of message, identify database object and respond accordingly
+
+on app startup
+    - start xbees
+    - start web server
+        - For each registered device type, load its objects from database
+
+
+Users (android app users):
+- users request access via app
+- access granted via switch
+- user object created
+    - user object has userid
+    - user object has token which can be changed
+    - messages from app contain user info so appropriate action can be taken
+    -
