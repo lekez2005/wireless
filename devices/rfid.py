@@ -3,7 +3,7 @@ __author__ = 'lekez2005'
 from flask import Blueprint, request
 from sqlalchemy.exc import IntegrityError
 from encoder import Encoder
-import json
+import json, datetime
 import sys
 sys.path.insert(0, '../')
 from app import db
@@ -33,6 +33,7 @@ class Rfid(db.Model):
 		return '<RFID: %s>' % (self.pretty_name, )
 
 	def react(self, message):
+		print message
 		mess = "".join((message.split())[0:4])
 		print 'Attempted login with id ' + mess
 		id = Card.query.get(mess)
@@ -43,12 +44,17 @@ class Rfid(db.Model):
 			else:
 				pass #TODO signal invalid id here
 		else:
-			print "Unrecognized card"
+
+			c = Card(mess, datetime.datetime.now().strftime("Added %a, %b %d %Y %H:%M"))
+			c.rfid_identifier = self.identifier
+			db.session.add(c)
+			db.session.commit()
+			print "Added new card " + mess
 
 	@classmethod
 	def load_to_dict(cls, modules):
 		try:
-			rfids = cls.query.filter_by(active=True).all()
+			rfids = cls.query.all()
 			if rfids is not None:
 				modules[Devices.RFID] = []
 				for rf in rfids:
@@ -61,6 +67,7 @@ class Card(db.Model):
 	identifier = db.Column(db.String(50), primary_key=True)
 	pretty_name = db.Column(db.String(50))
 	valid = db.Column(db.Boolean, default=True)
+	description = db.Column(db.Text)
 	rfid_identifier = db.Column(db.String, db.ForeignKey('rfid.identifier'))
 
 	def __init__(self, identifier, description, pretty_name=None):
@@ -73,7 +80,7 @@ class Card(db.Model):
 
 
 	def __repr__(self):
-		return '<RFID: %s>' % (self.pretty_name, )
+		return '<Card: %s>' % (self.pretty_name, )
 
 
 
@@ -110,6 +117,19 @@ def enable_card(card_identifier):
 	except:
 		db.session.rollback()
 		return json.dumps({'Status': 'Error', 'error': 'Database error'})
+
+
+@rfid.route('/update', methods=['POST'])
+def update_card():
+	data = request.get_json(force=True)
+	c = Card.query.get_or_404(data.get('identifier'))
+	c.pretty_name = data.get('pretty_name')
+	c.valid = data.get('valid')
+	c.description = data.get('description')
+	db.session.add(c)
+	db.session.commit()
+	return json.dumps({'Status': 'OK'})
+
 
 @rfid.route('/disable/<card_identifier>', methods=['GET', 'POST'])
 def disable_card(card_identifier):

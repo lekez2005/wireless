@@ -6,7 +6,7 @@ import serial
 from keys.gen_key import generate
 from flask_sqlalchemy import SQLAlchemy
 from devices import encoder
-from devices.device import Devices
+from devices.device import Devices, load_modules
 
 #from OpenSSL import SSL
 #context = SSL.Context(SSL.SSLv23_METHOD)
@@ -23,9 +23,6 @@ ser = None
 xbee = None
 
 
-modules = {}
-
-
 @app.route('/', methods=['GET'])
 def index():
 	return json.dumps([{'Doors': 'Front door'}])
@@ -33,16 +30,8 @@ def index():
 
 @app.route('/modules', methods=['GET'])
 def get_modules():
-	#out = {}
-	#for key,value in modules.iteritems():
-	#	if value:
-	#		temp = []
-	#		for v in value:
-	#			temp.append(json.dumps(v.__dict__, cls=encoder.Encoder))
-	#		out[key] = temp
-	#print out
+	return load_modules()
 
-	return json.dumps(modules, cls=encoder.Encoder)
 
 def process_xbee(data):
 	from devices.rfid import Rfid
@@ -66,23 +55,13 @@ def start_server(regenerate=False):
 	context = (server_crt, server_key)
 
 	#xbees
-	ser = serial.Serial('/dev/ttyUSB0', 9600)
-	xbee = XBee(ser, callback=process_xbee)
+	#ser = serial.Serial('/dev/ttyUSB0', 9600)
+	#xbee = XBee(ser, callback=process_xbee)
 
-	# load detectors from database
-	from devices.detector import Detector
-	Detector.load_to_dict(modules)
-
-	# load alarm from database
-	from devices.alarm import Alarm
-	Alarm.load_to_dict(modules)
-
-	# load rfid
-	from devices.rfid import Rfid, rfid
+	from devices.rfid import rfid
 	app.register_blueprint(rfid, url_prefix='/rfid')
-	Rfid.load_to_dict(modules)
 
-	print modules
+	print get_modules()
 
 
 

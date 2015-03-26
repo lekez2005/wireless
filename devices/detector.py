@@ -5,7 +5,13 @@ sys.path.insert(0, '../')
 from app import db
 
 from device import Devices
+from alarm import Alarm
 
+
+alarms = db.Table('detector_alarm',
+					 db.Column('alarm_id', db.String, db.ForeignKey('alarm.identifier')),
+					 db.Column('detector_id', db.String, db.ForeignKey('detector.identifier'))
+)
 
 
 class Detector(db.Model):
@@ -14,6 +20,8 @@ class Detector(db.Model):
 	device_type = db.Column(db.String(50), default=Devices.DETECTOR)
 	description = db.Column(db.Text)
 	active = db.Column(db.Boolean, default=True)
+	alarms = db.relationship(Alarm, secondary=alarms,
+							 backref=db.backref('detectors', lazy='select'))
 
 	def __init__(self, identifier, description, pretty_name=None):
 		self.identifier = identifier

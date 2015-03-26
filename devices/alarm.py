@@ -6,15 +6,8 @@ sys.path.insert(0, '../')
 from app import db
 
 from device import Devices
-from detector import Detector
 
 #db = SQLAlchemy()
-
-detectors = db.Table('device-alarm',
-					 db.Column('alarm-id', db.String, db.ForeignKey('alarm.identifier')),
-					 db.Column('detector-id', db.String, db.ForeignKey('detector.identifier'))
-)
-
 
 class Alarm(db.Model):
 	identifier = db.Column(db.String(50), primary_key=True)
@@ -22,9 +15,6 @@ class Alarm(db.Model):
 	device_type = db.Column(db.String(50), default=Devices.ALARM)
 	description = db.Column(db.Text)
 	active = db.Column(db.Boolean, default=True)
-	detectors = db.relationship(Detector, secondary=detectors,
-								backref=db.backref('alarms', lazy='select'))
-
 
 	def __init__(self, identifier, description, pretty_name=None):
 		self.identifier = identifier

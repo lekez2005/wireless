@@ -9,7 +9,7 @@ from app import db
 def init_db():
 	from detector import Detector
 	from alarm import Alarm
-	from rfid import Rfid, Card
+	#from rfid import Rfid, Card
 	db.create_all()
 	db.session.commit()
 	print db.metadata.tables.keys()
@@ -17,7 +17,7 @@ def init_db():
 def delete_all():
 	from detector import Detector
 	from alarm import Alarm
-	from rfid import Rfid, Card
+	#from rfid import Rfid, Card
 	db.drop_all()
 	db.session.commit()
 	print db.metadata.tables.keys()
@@ -31,7 +31,7 @@ def init_detector():
 
 def init_cards():
 	from rfid import Rfid, Card
-	#db.drop_all()
+	db.drop_all()
 	db.create_all()
 	rf1 = Rfid('frontdoor', 'For front door', "Front Door")
 	c1 = Card('6A0049DC', 'card 1', 'Card 1')
@@ -60,9 +60,8 @@ def reinitialize():
 	init_cards()
 
 #reinitialize()
-#init_db()
-#init_detector()
-#init_alarm()
-#init_alarm()
+init_db()
+init_detector()
+init_alarm()
 #reinitialize()
-init_cards()
+#init_cards()
