@@ -9,9 +9,11 @@ print os.path.join(os.path.dirname(__file__), os.pardir)
 from app import db
 from app import app
 
-from devices.alarm import Alarm
-from devices.detector import Detector, alarms
-from devices.rfid import Rfid, Card
+from models.alarm import Alarm
+from models.detector import Detector, alarms
+from models.rfid import Rfid, Card
+from models.door import Door
+from models.user import User, alarms
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 SQLALCHEMY_DATABASE_URI = app.config['SQLALCHEMY_DATABASE_URI']
