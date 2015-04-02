@@ -95,12 +95,14 @@ class JsonEncoder(Encoder):
 
 
 @rfid.route('/<identifier>', methods=['GET'])
+@requires_auth
 def get_rfid(identifier):
 	rf = Rfid.query.get_or_404(identifier)
 	rf.cards
 	return json.dumps(rf, cls=JsonEncoder)
 
 @rfid.route('/remove/<card_identifier>', methods=['GET'])
+@requires_auth
 def delete_card(card_identifier):
 	card = Card.query.get_or_404(card_identifier)
 	db.session.delete(card)
@@ -108,6 +110,7 @@ def delete_card(card_identifier):
 	return json.dumps({'Status': 'OK'})
 
 @rfid.route('/enable/<card_identifier>', methods=['GET', 'POST'])
+@requires_auth
 def enable_card(card_identifier):
 	card = Card.query.get_or_404(card_identifier)
 	card.valid = True
@@ -121,6 +124,7 @@ def enable_card(card_identifier):
 
 
 @rfid.route('/update', methods=['POST'])
+@requires_auth
 def update_card():
 	data = request.get_json(force=True)
 	c = Card.query.get_or_404(data.get('identifier'))
@@ -133,6 +137,7 @@ def update_card():
 
 
 @rfid.route('/disable/<card_identifier>', methods=['GET', 'POST'])
+@requires_auth
 def disable_card(card_identifier):
 	card = Card.query.get_or_404(card_identifier)
 	card.valid = False
@@ -145,6 +150,7 @@ def disable_card(card_identifier):
 		return json.dumps({'Status': 'Error', 'error': 'Database error'})
 
 @rfid.route('/<identifier>/add', methods=['POST'])
+@requires_auth
 def add_card(identifier):
 	rf = Rfid.query.get_or_404(identifier)
 	data = request.get_json(force=True)

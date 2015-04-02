@@ -37,6 +37,7 @@ class User(db.Model):
 user_blueprint = Blueprint('user', __name__)
 
 def authorize():
+	print "Implement hardware authorization here"
 	return True
 
 @user_blueprint.route('/users', methods=['GET'])

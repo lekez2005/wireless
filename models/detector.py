@@ -1,6 +1,7 @@
 __author__ = 'lekez2005'
 
 from flask import Blueprint, request
+from authenticate import requires_auth
 
 
 import sys
@@ -65,13 +66,16 @@ class Detector(db.Model):
 detector_blueprint = Blueprint('detector', __name__)
 
 @detector_blueprint.route('alarms/<identifier>', methods=['GET'])
+@requires_auth
 def get_alarms(identifier):
 	pass
 
 @detector_blueprint.route('alarms/add/<identifier>', methods=['POST'])
+@requires_auth
 def add_alarm(identifier):
 	pass
 
 @detector_blueprint.route('alarms/remove/<identifier>', methods=['POST'])
+@requires_auth
 def remove_alarm(identifier):
 	pass

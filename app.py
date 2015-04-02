@@ -28,7 +28,7 @@ from models.device import Devices, load_modules
 
 @app.route('/', methods=['GET'])
 def index():
-	return json.dumps([{'Doors': 'Front door'}])
+	return flask.jsonify({'Status': 'OK'})
 
 
 @app.route('/modules', methods=['GET'])
@@ -58,8 +58,8 @@ def start_server(regenerate=False):
 	context = (server_crt, server_key)
 
 	#xbees
-	#ser = serial.Serial('/dev/ttyUSB0', 9600)
-	#xbee = XBee(ser, callback=process_xbee)
+	ser = serial.Serial('/dev/ttyUSB0', 9600)
+	xbee = XBee(ser, callback=process_xbee)
 
 	from models.rfid import rfid
 	from models.door import door_blueprint

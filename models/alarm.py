@@ -1,6 +1,7 @@
 __author__ = 'lekez2005'
 
 from flask import Blueprint, request, jsonify
+from authenticate import requires_auth
 import json
 
 import sys
@@ -65,6 +66,7 @@ class JsonEncoder(Encoder):
 alarm_blueprint = Blueprint('alarm', __name__)
 
 @alarm_blueprint.route('/<identifier>')
+@requires_auth
 def get_alarm(identifier):
 	a = Alarm.query.get_or_404(identifier)
 	resp = json.loads(json.dumps(a, cls=JsonEncoder))
@@ -73,6 +75,7 @@ def get_alarm(identifier):
 	return jsonify(resp)
 
 @alarm_blueprint.route('/update', methods=['POST'])
+@requires_auth
 def update_card():
 	data = request.get_json(force=True)
 	c = Alarm.query.get_or_404(data.get('identifier'))
@@ -84,12 +87,14 @@ def update_card():
 	return json.dumps({'Status': 'OK'})
 
 @alarm_blueprint.route('/ring/<identifier>', methods=['GET'])
+@requires_auth
 def ring_alarm(identifier):
 	a = Alarm.query.get_or_404(identifier)
 	a.ring()
 	return jsonify({'Status': 'OK'})
 
 @alarm_blueprint.route('/stop/<identifier>', methods=['GET'])
+@requires_auth
 def stop_alarm(identifier):
 	a = Alarm.query.get_or_404(identifier)
 	a.stop()
@@ -97,6 +102,7 @@ def stop_alarm(identifier):
 
 
 @alarm_blueprint.route('/add/detector', methods=['POST'])
+@requires_auth
 def add_detector():
 	from detector import Detector
 	data = request.get_json(force=True)
@@ -108,6 +114,7 @@ def add_detector():
 
 
 @alarm_blueprint.route('/remove/detector', methods=['POST'])
+@requires_auth
 def remove_detector():
 	from detector import Detector
 	data = request.get_json(force=True)

@@ -2,6 +2,7 @@ __author__ = 'lekez2005'
 
 import sys, json
 from flask import Blueprint, request
+from authenticate import requires_auth
 from device import Devices
 from rfid import Rfid, Card
 from encoder import Encoder
@@ -62,6 +63,7 @@ class JsonEncoder(Encoder):
 door_blueprint = Blueprint('door', __name__)
 
 @door_blueprint.route('/<identifier>', methods=['GET'])
+@requires_auth
 def get_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.rfid
@@ -69,18 +71,21 @@ def get_door(identifier):
 
 
 @door_blueprint.route('/unlock/<identifier>')
+@requires_auth
 def unlock_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.unlock()
 	return json.dumps({'Status': 'OK'})
 
 @door_blueprint.route('/lock/<identifier>')
+@requires_auth
 def lock_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.lock()
 	return json.dumps({'Status': 'OK'})
 
 @door_blueprint.route('/update', methods=['POST'])
+@requires_auth
 def update_door():
 	data = request.get_json(force=True)
 	print data

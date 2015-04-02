@@ -11,7 +11,6 @@ def check_auth(userid, token):
 	from user import User
 	try:
 		u = User.query.get(userid)
-		print u.token, token
 		return (u.token == token) and u.authorized
 	except:
 		return False
@@ -27,7 +26,7 @@ def requires_auth(f):
 	def decorated(*args, **kwargs):
 		print 'Attempted auth'
 		try:
-			userid = request.headers['userid']
+			userid = request.headers['user_id']
 			token = request.headers['token']
 		except KeyError, e:
 			print e
