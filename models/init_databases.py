@@ -69,7 +69,16 @@ def reinitialize():
 from door import Door
 from rfid import Rfid, Card
 from alarm import Alarm
-from user import User
-u = User.query.get('lekez2005')
-print u.__dict__
+from detector import Detector
+from user import User, alarms
+u = User.query.first()
+#ds = Detector.query.all()
+#for d in ds:
+#	print d.identifier
+d = Detector.query.get('window1')
+# print d
+# u.detectors.append(d)
+# db.session.add(u)
+# db.session.commit()
+print d.users
 

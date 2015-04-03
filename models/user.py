@@ -1,11 +1,18 @@
 __author__ = 'lekez2005'
 from alarm import Alarm
+from detector import Detector
 from flask import Blueprint, request, abort, jsonify
 from authenticate import requires_auth
+from gcm import GCM
 
 import sys
 sys.path.insert(0, '../')
 from app import db
+
+detectors = db.Table('user_detector',
+				  db.Column('detector_id', db.String, db.ForeignKey('detector.identifier')),
+				  db.Column('user_id', db.String, db.ForeignKey('user.identifier'))
+)
 
 alarms = db.Table('user_alarm',
 				  db.Column('alarm_id', db.String, db.ForeignKey('alarm.identifier')),
@@ -18,6 +25,10 @@ class User(db.Model):
 	name = db.Column(db.String)
 	authorized = db.Column(db.Boolean, default=False)
 	gcm_id = db.Column(db.String)
+	notify = db.Column(db.Boolean, default=False)
+
+	detectors = db.relationship(Detector, secondary=detectors,
+							 backref=db.backref('users', lazy='select'))
 
 	alarms = db.relationship(Alarm, secondary=alarms,
 							 backref=db.backref('users', lazy='select'))
@@ -105,4 +116,39 @@ def remove_user():
 	db.session.delete(u)
 	db.session.commit()
 	return jsonify({'Status': 'OK'})
+
+
+
+class GcmMessage():
+	#TODO move to config
+	API_KEY = 'AIzaSyDMZKT9sArFwBI8k2TAm-0FNgU37ulegWU'
+	gcm = GCM(API_KEY)
+
+
+	@staticmethod
+	def make_message(device):
+		return {'device': device.device_type, 'identifier': device.identifier}
+
+
+	@staticmethod
+	def send_mesage(cls, ids, data):
+		response = cls.gcm.json_request(registration_ids=ids, data=data)
+
+		if 'errors' in response:
+			for error, reg_ids in response['errors'].items():
+				if error in ['NotRegistered', 'InvalidRegistration']:
+					for reg_id in reg_ids:
+						u = User.query.filter(gcm_id=reg_id).first()
+						u.gcm_id = None
+						db.session.add(u)
+						db.session.commit()
+		if 'canonical' in response:
+			for reg_id, canonical_id in response['canonical'].items():
+				u = User.query.filter(gcm_id=reg_id).first()
+				u.gcm_id = canonical_id
+				db.session.add(u)
+				db.session.commit()
+
+
+
 

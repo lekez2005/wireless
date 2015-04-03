@@ -30,6 +30,7 @@ class Alarm(db.Model):
 		else:
 			self.pretty_name = pretty_name
 
+
 	@classmethod
 	def load_to_dict(cls, modules):
 		try:

@@ -38,8 +38,10 @@ def get_modules():
 
 def process_xbee(data):
 	from models.rfid import Rfid
+	from models.detector import Detector
+	from models.user import User
 	if 'rf_data' in data:
-		raw_message = data.get('rf_data').split('#')
+		raw_message = data.get('rf_data').split('#', 2)
 		device = raw_message[0]
 		identifier = raw_message[1]
 		if device == Devices.RFID:
@@ -47,6 +49,13 @@ def process_xbee(data):
 				rfid = Rfid.query.get(identifier)
 				if rfid is not None:
 					rfid.react(raw_message[2])
+			except Exception, e:
+				print e
+		elif device == Devices.DETECTOR:
+			try:
+				det = Detector.query.get(identifier)
+				if det is not None:
+					det.react(raw_message[2])
 			except Exception, e:
 				print e
 		print data
