@@ -2,6 +2,7 @@ __author__ = 'lekez2005'
 
 import flask,os, json
 from xbee import XBee
+from models import pi
 import serial
 from keys.gen_key import generate
 from flask_sqlalchemy import SQLAlchemy
@@ -69,6 +70,7 @@ def start_server(regenerate=False):
 	#xbees
 	ser = serial.Serial('/dev/ttyUSB0', 9600)
 	xbee = XBee(ser, callback=process_xbee)
+	pi.setup()
 
 	from models.rfid import rfid
 	from models.door import door_blueprint
@@ -93,6 +95,7 @@ def start_server(regenerate=False):
 		print "Force closed"
 		xbee.halt()
 		ser.close()
+		pi.clean_up()
 
 
 if __name__=="__main__":

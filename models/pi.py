@@ -20,7 +20,6 @@ def setup():
 
 def authorize(timeout=8000):
 	acq = lock.acquire(False)
-	print acq
 	if acq is False:
 		return False
 	start_time = current_milli_time()

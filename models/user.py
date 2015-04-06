@@ -1,4 +1,5 @@
 __author__ = 'lekez2005'
+import pi
 from alarm import Alarm
 from detector import Detector
 from flask import Blueprint, request, abort, jsonify
@@ -48,8 +49,7 @@ class User(db.Model):
 user_blueprint = Blueprint('user', __name__)
 
 def authorize():
-	print "Implement hardware authorization here"
-	return True
+	return pi.authorize(8000)
 
 @user_blueprint.route('/users', methods=['GET'])
 def get_users():
