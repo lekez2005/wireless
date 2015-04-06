@@ -18,7 +18,7 @@ def setup_pins():
 def authorize(timeout=5000):
 	start_time = current_milli_time()
 	output = True
-	while current_milli_time-start_time < timeout:
+	while current_milli_time()-start_time < timeout:
 		GPIO.output(AUTH_INDICATOR, output)
 		if GPIO.input(AUTH_PIN) == 1:
 			return True
