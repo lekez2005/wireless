@@ -66,13 +66,14 @@ class Detector(db.Model):
 
 		gcm_ids = []
 		for u in users:
+			print u
 			if u.notify and u.gcm_id:
 				gcm_ids.append(u.gcm_id)
 		if gcm_ids:
 			data = GcmMessage.make_message(self)
 			data['message'] = self.alarm_message
-			print 'Sending message' + data
-			#GcmMessage.send_mesage(gcm_ids, data)
+			print 'Sending message' + str(data)
+			GcmMessage.send_mesage(gcm_ids, data)
 		print "React to " + message
 
 	def respond_to_app(self, app_message):

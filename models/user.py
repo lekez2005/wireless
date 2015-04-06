@@ -84,6 +84,16 @@ def register_user():
 def update_token():
 	if not authorize():
 		abort(401)
+	try:
+		userid = request.headers['user_id']
+		u = User.query.get(userid)
+		u.token = ""
+		u.gcm_id = None
+		db.session.add(u)
+		db.session.commit()
+		print "Old record purged"
+	except:
+		db.session.rollback()
 	data = request.get_json(force=True)
 	identifier = data.get('identifier')
 	u = User.query.get_or_404(identifier)
@@ -130,7 +140,7 @@ class GcmMessage():
 		return {'device': device.device_type, 'identifier': device.identifier}
 
 
-	@staticmethod
+	@classmethod
 	def send_mesage(cls, ids, data):
 		response = cls.gcm.json_request(registration_ids=ids, data=data)
 

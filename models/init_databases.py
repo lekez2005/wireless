@@ -24,7 +24,7 @@ def delete_all():
 
 def init_detector():
 	from detector import Detector
-	d1 = Detector("window1", "This is the window detector", "Window detector")
+	d1 = Detector("frontdoor", "Front Door", "Knock detector")
 	db.session.add(d1)
 	db.session.commit()
 	print Detector.query.all()
@@ -75,10 +75,13 @@ u = User.query.first()
 #ds = Detector.query.all()
 #for d in ds:
 #	print d.identifier
-d = Detector.query.get('window1')
 # print d
 # u.detectors.append(d)
 # db.session.add(u)
 # db.session.commit()
-print d.users
+d = Detector.query.get('frontdoor')
+u.detectors.append(d)
+db.session.add(u)
+db.session.commit()
+print u.gcm_id
 
