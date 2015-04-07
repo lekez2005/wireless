@@ -99,6 +99,8 @@ def update_token():
 	u = User.query.get_or_404(identifier)
 	token = data.get('token')
 	u.token = token
+	id = data.get('gcm_id')
+	u.gcm_id = id
 	db.session.add(u)
 	db.session.commit()
 	return jsonify({'Status': 'OK'})

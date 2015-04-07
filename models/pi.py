@@ -31,6 +31,7 @@ def authorize(timeout=8000):
 			return True
 		time.sleep(0.1)
 		output = not output
+	GPIO.output(AUTH_INDICATOR, False)
 	lock.release()
 	return False
 
