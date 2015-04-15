@@ -29,6 +29,7 @@ class Detector(db.Model):
 	alarms = db.relationship(Alarm, secondary=alarms,
 							 backref=db.backref('detectors', lazy='select'))
 	alarm_message = db.Column(db.Text)
+	address = db.Column(db.Integer)
 
 	def __init__(self, identifier, description, pretty_name=None, alert_m = None):
 		self.identifier = identifier

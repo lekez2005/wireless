@@ -1,7 +1,7 @@
 __author__ = 'lekez2005'
 
 import sys, json
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from authenticate import requires_auth
 from device import Devices
 from rfid import Rfid, Card
@@ -9,7 +9,7 @@ from encoder import Encoder
 
 
 sys.path.insert(0, '../')
-from app import db
+from app import db, transmit_message
 
 class Door(db.Model):
 	identifier = db.Column(db.String, primary_key=True)
@@ -19,12 +19,15 @@ class Door(db.Model):
 
 	rfid = db.relationship('Rfid', uselist=False, backref='door', lazy='select')
 	active = db.Column(db.Boolean, default=True)
+	address = db.Column(db.Integer)
 
-	def __init__(self, identifier, description, pretty_name=None):
+	def __init__(self, identifier, description, address, pretty_name=None, active=True):
 		self.identifier = identifier
 		self.description = description
+		self.address = address
 		self.identifier = identifier
 		self.description = description
+		self.active = active
 		if pretty_name is None:
 			self.pretty_name = identifier
 		else:
@@ -48,10 +51,10 @@ class Door(db.Model):
 		pass
 
 	def unlock(self):
-		print 'Unlock door'
+		transmit_message(self.address, Devices.DOOR + "#%s#unlock"%self.identifier)
 
 	def lock(self):
-		print 'Lock door'
+		transmit_message(self.address, Devices.DOOR + "#%s#lock"%self.identifier)
 
 class JsonEncoder(Encoder):
 	def default(self, o):
@@ -61,6 +64,24 @@ class JsonEncoder(Encoder):
 		return o.__dict__
 
 door_blueprint = Blueprint('door', __name__)
+
+@requires_auth
+@door_blueprint.route('/add', methods=['POST'])
+def add_door():
+	data = request.get_json(force=True)
+	id = data.get('identifier')
+	d = {}
+	d['description'] = data.get('description')
+	d['address'] = data.get('address')
+	if 'pretty_name' in data:
+		d['pretty_name'] = data.get('pretty_name')
+	if 'active' in data:
+		d['active'] = data.get('active')
+	do = Door(id, d['description'], d['address'], pretty_name=d['pretty_name'], active=d['active'])
+	print do
+	db.session.add(do)
+	db.session.commit()
+	return jsonify({'Status': 'OK'})
 
 @door_blueprint.route('/<identifier>', methods=['GET'])
 @requires_auth
@@ -75,18 +96,29 @@ def get_door(identifier):
 def unlock_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.unlock()
-	return json.dumps({'Status': 'OK'})
+	return jsonify({'Status': 'OK'})
 
 @door_blueprint.route('/lock/<identifier>')
 @requires_auth
 def lock_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.lock()
-	return json.dumps({'Status': 'OK'})
+	return jsonify({'Status': 'OK'})
 
 @door_blueprint.route('/update', methods=['POST'])
 @requires_auth
 def update_door():
 	data = request.get_json(force=True)
-	print data
-	return json.dumps({'Status': 'OK'})
+	id = data.get('identifier')
+	d = Door.query.get_or_404(id)
+	if 'description' in data:
+		d.description = data.get('description')
+	if 'pretty_name' in data:
+		d.pretty_name = data.get('pretty_name')
+	if 'address' in data:
+		d.address = data.get('address')
+	if 'active' in data:
+		d.active = data.get('active')
+	db.session.add(d)
+	db.session.commit()
+	return jsonify({'Status': 'OK'})

@@ -19,6 +19,7 @@ class Rfid(db.Model):
 	door_identifier = db.Column(db.String, db.ForeignKey('door.identifier'))
 	cards = db.relationship('Card', backref='rfid', lazy='select')
 	active = db.Column(db.Boolean, default=True)
+	address = db.Column(db.Integer)
 
 	def __init__(self, identifier, description, pretty_name=None):
 		self.identifier = identifier

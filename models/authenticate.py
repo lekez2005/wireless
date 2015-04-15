@@ -17,7 +17,11 @@ def check_auth(userid, token):
 	from user import User
 	try:
 		u = User.query.get(userid)
-		return (u.token == token) and u.authorized
+		if (u.token == token) and u.authorized:
+			return True
+		else:
+			print 'Actual Token: ', u.token, 'presented: ', token
+			return False
 	except:
 		return False
 

@@ -20,6 +20,7 @@ class Alarm(db.Model):
 	device_type = db.Column(db.String(50), default=Devices.ALARM)
 	description = db.Column(db.Text)
 	active = db.Column(db.Boolean, default=True)
+	address = db.Column(db.Integer)
 
 	def __init__(self, identifier, description, pretty_name=None):
 		self.identifier = identifier

@@ -1,7 +1,9 @@
 __author__ = 'lekez2005'
 
 import flask,os, json
+from xbee.python2to3 import intToByte, stringToBytes
 from xbee import XBee
+
 from models import pi
 import serial
 from keys.gen_key import generate
@@ -11,10 +13,6 @@ app = flask.Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 db = SQLAlchemy(app)
 
-
-#xbees
-ser = None
-xbee = None
 
 from models import encoder
 from models.device import Devices, load_modules
@@ -36,6 +34,12 @@ def index():
 def get_modules():
 	return load_modules()
 
+def transmit_message(address, message, verbose=True):
+	ad = intToByte(address/256) + intToByte(address%256)
+	if verbose:
+		print "Send " + message + " to " + str(address)
+	xbee.tx(dest_addr=ad, data=stringToBytes(message+'\n'))
+
 
 def process_xbee(data):
 	from models.rfid import Rfid
@@ -44,9 +48,9 @@ def process_xbee(data):
 	if 'rf_data' in data:
 		raw_message = data.get('rf_data').split('#', 2)
 		device = raw_message[0]
-		identifier = raw_message[1]
 		if device == Devices.RFID:
 			try:
+				identifier = raw_message[1]
 				rfid = Rfid.query.get(identifier)
 				if rfid is not None:
 					rfid.react(raw_message[2])
@@ -54,6 +58,7 @@ def process_xbee(data):
 				print e
 		elif device == Devices.DETECTOR:
 			try:
+				identifier = raw_message[1]
 				det = Detector.query.get(identifier)
 				if det is not None:
 					det.react(raw_message[2])
@@ -61,15 +66,16 @@ def process_xbee(data):
 				print e
 		print data
 
+#xbees
+ser = serial.Serial('/dev/ttyUSB0', 9600)
+xbee = XBee(ser, callback=process_xbee)
 
 def start_server(regenerate=False):
 	# https setup
 	ip, server_crt, server_key = generate(regenerate)
 	context = (server_crt, server_key)
 
-	#xbees
-	ser = serial.Serial('/dev/ttyUSB0', 9600)
-	xbee = XBee(ser, callback=process_xbee)
+
 	pi.setup()
 
 	from models.rfid import rfid
