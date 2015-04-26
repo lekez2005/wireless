@@ -7,18 +7,20 @@ from authenticate import requires_auth
 from gcm import GCM
 
 import sys
+
 sys.path.insert(0, '../')
 from app import db
 
 detectors = db.Table('user_detector',
-				  db.Column('detector_id', db.String, db.ForeignKey('detector.identifier')),
-				  db.Column('user_id', db.String, db.ForeignKey('user.identifier'))
-)
+					 db.Column('detector_id', db.String, db.ForeignKey('detector.identifier')),
+					 db.Column('user_id', db.String, db.ForeignKey('user.identifier'))
+					 )
 
 alarms = db.Table('user_alarm',
 				  db.Column('alarm_id', db.String, db.ForeignKey('alarm.identifier')),
 				  db.Column('user_id', db.String, db.ForeignKey('user.identifier'))
-)
+				  )
+
 
 class User(db.Model):
 	identifier = db.Column(db.String, primary_key=True)
@@ -29,7 +31,7 @@ class User(db.Model):
 	notify = db.Column(db.Boolean, default=False)
 
 	detectors = db.relationship(Detector, secondary=detectors,
-							 backref=db.backref('users', lazy='select'))
+								backref=db.backref('users', lazy='select'))
 
 	alarms = db.relationship(Alarm, secondary=alarms,
 							 backref=db.backref('users', lazy='select'))
@@ -46,10 +48,21 @@ class User(db.Model):
 		return '<User: %s>' % self.name
 
 
+def add_commit(item):
+	try:
+		db.session.add(item)
+		db.session.commit()
+	except Exception, e:
+		print e.message
+		db.session.rollback()
+
+
 user_blueprint = Blueprint('user', __name__)
+
 
 def authorize():
 	return pi.authorize(8000)
+
 
 @user_blueprint.route('/users', methods=['GET'])
 def get_users():
@@ -58,42 +71,58 @@ def get_users():
 	resp = {'Status': 'OK', 'users': user_dict}
 	return jsonify(resp)
 
+
+@user_blueprint.route('/user/<identifier>')
+@requires_auth
+def get_user(identifier):
+	u = User.query.get_or_404(identifier)
+	resp = {'Status': 'OK', 'user': {'identifier': u.identifier, 'name': u.name,
+			'authorized': u.authorized, 'notify': u.notify}}
+	return jsonify(resp)
+
+
 @user_blueprint.route('/register', methods=['POST'])
 def register_user():
 	data = request.get_json(force=True)
 	identifier = data.get('identifier')
 	if User.query.get(identifier) is not None:
 		return jsonify({'Status': 'ERROR', 'error': "User already exists"})
+	if not identifier:
+		return jsonify({'Status': 'ERROR', 'error': "Empty user identifier"})
 	# implement hardware auhorization here
 	if authorize():
-		token = data.get('token')
+		token = data.get('token')  # TODO remove this requirement
 		name = token
 		try:
 			name = data.get('name')
 		except:
 			pass
+
 		u = User(identifier, token, name)
 		u.authorized = True
-		db.session.add(u)
-		db.session.commit()
-		return jsonify({'Status': 'OK'})
+		u.notify = True
+		try:
+			db.session.add(u)
+			db.session.commit()
+			return jsonify({'Status': 'OK'})
+		except:
+			db.session.rollback()
+			return jsonify({'Status': 'ERROR', 'error': "User already exists"})
 	else:
-		abort(401)
+		return jsonify({'Status': 'ERROR', 'error': 'Not authorized'})
+
 
 @user_blueprint.route('/update/token', methods=['POST'])
 def update_token():
 	if not authorize():
 		abort(401)
-	try:
-		userid = request.headers['user_id']
-		u = User.query.get(userid)
-		u.token = ""
-		u.gcm_id = None
-		db.session.add(u)
-		db.session.commit()
-		print "Old record purged"
-	except:
-		db.session.rollback()
+	userid = request.headers['user_id']
+	u = User.query.get(userid)
+	u.token = ""
+	u.gcm_id = None
+	add_commit(u)
+	print "Old record purged"
+
 	data = request.get_json(force=True)
 	identifier = data.get('identifier')
 	u = User.query.get_or_404(identifier)
@@ -101,9 +130,27 @@ def update_token():
 	u.token = token
 	id = data.get('gcm_id')
 	u.gcm_id = id
-	db.session.add(u)
-	db.session.commit()
+	add_commit(u)
 	return jsonify({'Status': 'OK'})
+
+
+@user_blueprint.route('/edit', methods=['POST'])
+@requires_auth
+def edit_user():
+	data = request.get_json(force=True)
+	identifier = data.get('identifier')
+	u = User.query.get_or_404(identifier)
+	u.name = data.get('name')
+	u.authorized = data.get('authorized')
+	u.notify = data.get('notify')
+	try:
+		db.session.add(u)
+		db.session.commit()
+		return jsonify({'Status': 'OK'})
+	except Exception, e:
+		db.session.rollback()
+		return jsonify({'Status': 'ERROR', 'error': e.message})
+
 
 @user_blueprint.route('/update/gcm', methods=['POST'])
 @requires_auth
@@ -113,33 +160,28 @@ def update_gcm():
 	u = User.query.get_or_404(identifier)
 	id = data.get('gcm_id')
 	u.gcm_id = id
-	db.session.add(u)
-	db.session.commit()
+	add_commit(u)
 	return jsonify({'Status': 'OK'})
 
 
-
-@user_blueprint.route('/remove', methods=['POST'])
+@user_blueprint.route('/delete/<identifier>', methods=['GET'])
 @requires_auth
-def remove_user():
-	data = request.get_json(force=True)
-	identifier = data.get('identifier')
+def remove_user(identifier):
 	u = User.query.get_or_404(identifier)
-	db.session.delete(u)
-	db.session.commit()
-	return jsonify({'Status': 'OK'})
+	try:
+		db.session.delete(u)
+		db.session.commit()
+		return jsonify({'Status': 'OK'})
+	except Exception, e:
+		db.session.rollback
+		return jsonify({'Status': 'ERROR', 'error': e.message})
 
 
 
 class GcmMessage():
-	#TODO move to config
+	# TODO move to config
 	API_KEY = 'AIzaSyDMZKT9sArFwBI8k2TAm-0FNgU37ulegWU'
 	gcm = GCM(API_KEY)
-
-
-	@staticmethod
-	def make_message(device):
-		return {'device': device.device_type, 'identifier': device.identifier}
 
 
 	@classmethod
@@ -152,14 +194,12 @@ class GcmMessage():
 					for reg_id in reg_ids:
 						u = User.query.filter(gcm_id=reg_id).first()
 						u.gcm_id = None
-						db.session.add(u)
-						db.session.commit()
+						add_commit(u)
 		if 'canonical' in response:
 			for reg_id, canonical_id in response['canonical'].items():
 				u = User.query.filter(gcm_id=reg_id).first()
 				u.gcm_id = canonical_id
-				db.session.add(u)
-				db.session.commit()
+				add_commit(u)
 
 
 

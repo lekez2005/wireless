@@ -95,6 +95,14 @@ class JsonEncoder(Encoder):
 		return o.__dict__
 
 
+def add_commit(item):
+	try:
+		db.session.add(item)
+		db.session.commit()
+	except Exception, e:
+		print e.message
+		db.session.rollback()
+
 @rfid.route('/<identifier>', methods=['GET'])
 @requires_auth
 def get_rfid(identifier):
@@ -132,8 +140,7 @@ def update_card():
 	c.pretty_name = data.get('pretty_name')
 	c.valid = data.get('valid')
 	c.description = data.get('description')
-	db.session.add(c)
-	db.session.commit()
+	add_commit(c)
 	return json.dumps({'Status': 'OK'})
 
 

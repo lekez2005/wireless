@@ -1,20 +1,22 @@
 __author__ = 'lekez2005'
 
-import flask,os, json
+import os
+
+import flask
 from xbee.python2to3 import intToByte, stringToBytes
 from xbee import XBee
+import serial
+from flask_sqlalchemy import SQLAlchemy
 
 from models import pi
-import serial
+from models.authenticate import requires_auth
 from keys.gen_key import generate
-from flask_sqlalchemy import SQLAlchemy
+
 
 app = flask.Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
 db = SQLAlchemy(app)
 
-
-from models import encoder
 from models.device import Devices, load_modules
 
 #from OpenSSL import SSL
@@ -34,6 +36,14 @@ def index():
 def get_modules():
 	return load_modules()
 
+@app.route('/activate', methods=['POST'])
+@requires_auth
+def activate():
+	data = flask.request.get_json(force=True)
+	state = data.get('state')
+	pi.set_alarm_active(state)
+	return flask.jsonify({'Status': 'OK'})
+
 def transmit_message(address, message, verbose=True):
 	ad = intToByte(address/256) + intToByte(address%256)
 	if verbose:
@@ -44,7 +54,7 @@ def transmit_message(address, message, verbose=True):
 def process_xbee(data):
 	from models.rfid import Rfid
 	from models.detector import Detector
-	from models.user import User
+
 	if 'rf_data' in data:
 		raw_message = data.get('rf_data').split('#', 2)
 		device = raw_message[0]
@@ -96,8 +106,11 @@ def start_server(regenerate=False):
 
 	port = int(os.environ.get('PORT', 5000))
 	try:
+		pi.display(ip, 1)
 		app.run(host=ip, port=port, debug=True, ssl_context=context, use_reloader=False)
 	finally:
+		pi.lcd.clear()
+		pi.display('Closing')
 		print "Force closed"
 		xbee.halt()
 		ser.close()

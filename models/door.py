@@ -88,7 +88,9 @@ def add_door():
 def get_door(identifier):
 	d = Door.query.get_or_404(identifier)
 	d.rfid
-	return json.dumps(d, cls=JsonEncoder)
+	resp = json.loads(json.dumps(d, cls=JsonEncoder))
+	resp['Status'] = 'OK'
+	return jsonify(resp)
 
 
 @door_blueprint.route('/unlock/<identifier>')
