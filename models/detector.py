@@ -2,16 +2,17 @@ __author__ = 'lekez2005'
 
 from flask import Blueprint, request, jsonify
 from authenticate import requires_auth
-import json
-
+import json, threading, datetime
 
 import sys
+
 sys.path.insert(0, '../')
 from app import db
 
 from encoder import Encoder
 from device import Devices
 from alarm import Alarm
+import pi
 
 
 IDENTIFIER = 'identifier'
@@ -23,9 +24,31 @@ ALARMS = 'alarms'
 ALARM_MESSAGE = 'alarm_message'
 
 alarms = db.Table('detector_alarm',
-					 db.Column('alarm_id', db.String, db.ForeignKey('alarm.identifier')),
-					 db.Column('detector_id', db.String, db.ForeignKey('detector.identifier'))
-)
+				  db.Column('alarm_id', db.String, db.ForeignKey('alarm.identifier')),
+				  db.Column('detector_id', db.String, db.ForeignKey('detector.identifier'))
+				  )
+
+lock = threading.Lock()
+TIMEOUT = 5  # 5 seconds TODO make this configurable
+
+last_trigger = {}
+
+
+def get_last_trigger(identifier):
+	res = True
+	global last_trigger
+	try:
+		lock.acquire()
+		if last_trigger.get(identifier) is None:
+			last_trigger[identifier] = datetime.datetime.utcnow()
+		else:
+			res = last_trigger[identifier] + datetime.timedelta(seconds=TIMEOUT) < datetime.datetime.utcnow()
+			last_trigger[identifier] = datetime.datetime.utcnow()
+	finally:
+		lock.release()
+	if not res:
+		print "Multiple trigger discarded"
+	return res
 
 
 class Detector(db.Model):
@@ -39,7 +62,7 @@ class Detector(db.Model):
 	alarm_message = db.Column(db.Text)
 	address = db.Column(db.Integer)
 
-	def __init__(self, identifier, description, pretty_name=None, alert_m = None):
+	def __init__(self, identifier, description, pretty_name=None, alert_m=None):
 		self.identifier = identifier
 		self.description = description
 		if pretty_name is None:
@@ -55,39 +78,42 @@ class Detector(db.Model):
 	@classmethod
 	def load_to_dict(cls, modules):
 		try:
-			detectors = cls.query.filter_by(active=True).all()
+			detectors = cls.query.all()
 			if detectors is not None:
 				modules[Devices.DETECTOR] = []
 				for det in detectors:
-					modules[Devices.DETECTOR].append((det.identifier, det.pretty_name))
+					d = {IDENTIFIER: det.identifier, PRETTY_NAME: det.pretty_name,
+						 DESCRIPTION: det.description, ADDRESS: det.address,
+						 ALARMS: [al.identifier for al in det.alarms],
+						 ACTIVE: det.active}
+					modules[Devices.DETECTOR].append(d)
 		except Exception, e:
 			print e
-
-
 
 
 	def __repr__(self):
 		return '<Detector: %s, %s>' % (self.identifier, self.description)
 
 	def react(self, message):
+		if message.strip() == 'stop':
+			for al in self.alarms:
+					al.stop()
 
-		if self.active:
-			if message != 'Stop':
+		elif self.active and pi.is_activated() and get_last_trigger(self.identifier):
+			print message
+			if message.strip() != 'stop':
 				self.notify_users()
 				for al in self.alarms:
 					al.ring()
-			else:
-				for al in self.alarms:
-					al.stop()
 
 		print "React to " + message
 
 	def notify_users(self):
 		from user import User, detectors, GcmMessage
+
 		users = User.query.all()
 		gcm_ids = []
 		for u in users:
-			print u
 			if u.notify and u.gcm_id:
 				gcm_ids.append(u.gcm_id)
 		if gcm_ids:
@@ -109,6 +135,7 @@ class JsonEncoder(Encoder):
 			return super(JsonEncoder, self).default(o)
 		return o.__dict__
 
+
 def add_commit(item):
 	try:
 		db.session.add(item)
@@ -117,7 +144,9 @@ def add_commit(item):
 		print e.message
 		db.session.rollback()
 
+
 detector_blueprint = Blueprint('detector', __name__)
+
 
 @detector_blueprint.route('/', methods=['GET'])
 @requires_auth
@@ -133,14 +162,17 @@ def get_all():
 	resp['Status'] = 'OK'
 	return jsonify(resp)
 
+
 @detector_blueprint.route('/<identifier>', methods=['GET'])
 @requires_auth
 def get_detector(identifier):
-	d = Detector.query.get_or_404(identifier)
-	resp = json.loads(json.dumps(d, cls=JsonEncoder))
-	resp['Status'] = 'OK'
-	resp['alarms'] = [ [al.identifier, al.pretty_name]  for al in d.alarms]
-	return jsonify(resp)
+	det = Detector.query.get_or_404(identifier)
+	d = {IDENTIFIER: det.identifier, PRETTY_NAME: det.pretty_name, DESCRIPTION: det.description,
+		 ADDRESS: det.address, ALARM_MESSAGE: det.alarm_message,
+		 ACTIVE: det.active, 'Status': 'OK'}
+
+	return jsonify(d)
+
 
 @detector_blueprint.route('/update', methods=['POST'])
 @requires_auth
@@ -161,6 +193,52 @@ def update_detector():
 	return jsonify({'Status': 'OK'})
 
 
+@detector_blueprint.route('/add', methods=['POST'])
+@requires_auth
+def add_detector():
+	data = request.get_json(force=True)
+	identifier = data.get('identifier')
+	if Detector.query.get(identifier) is not None:
+		return jsonify({'Status': 'ERROR', 'error': "Detector already exists"})
+	if not identifier:
+		return jsonify({'Status': 'ERROR', 'error': "Empty detector identifier"})
+	pretty_name, description, address, alert_m = (None, None, None, None)
+	active = True
+	if data.get('pretty_name') is not None:
+		pretty_name = data.get('pretty_name')
+	if data.get('active') is not None:
+		active = data.get('active')
+	if data.get('description') is not None:
+		description = data.get('description')
+	if data.get('address') is not None:
+		address = data.get('address')
+	if data.get(ALARM_MESSAGE) is not None:
+		alert_m = data.get(ALARM_MESSAGE)
+	det = Detector(identifier, description, pretty_name, alert_m)
+	det.address = address
+	det.active = active
+	try:
+		db.session.add(det)
+		db.session.commit()
+		return jsonify({'Status': 'OK'})
+	except Exception, e:
+		db.session.rollback()
+		return jsonify({'Status': 'ERROR', 'error': e.message})
+
+
+@detector_blueprint.route('/delete/<identifier>', methods=['GET'])
+@requires_auth
+def delete_detector(identifier):
+	det = Detector.query.get_or_404(identifier)
+	try:
+		db.session.delete(det)
+		db.session.commit()
+		return jsonify({'Status': 'OK'})
+	except Exception, e:
+		db.session.rollback()
+		return jsonify({'Status': 'ERROR', 'error': e.message})
+
+
 @detector_blueprint.route('/add/alarm', methods=['POST'])
 @requires_auth
 def add_alarm():
@@ -169,6 +247,7 @@ def add_alarm():
 	det.alarms.append(Alarm.query.get_or_404(data.get('alarm')))
 	add_commit(det)
 	return jsonify({'Status': 'OK'})
+
 
 @detector_blueprint.route('/remove/alarm', methods=['POST'])
 @requires_auth

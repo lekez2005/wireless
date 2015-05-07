@@ -10,7 +10,7 @@ AUTH_INDICATOR = 19
 
 ALARM_TOGGLE = 13
 ALARM_INDICATOR = 6
-ALARM_ACTIVE = False
+ALARM_ACTIVE = True
 RING_STOP = 5
 
 ALARM_ONE = 22
@@ -76,6 +76,8 @@ a_two = None
 lcd = None
 
 
+def is_activated():
+	return ALARM_ACTIVE
 
 def alarm_toggle(channel):
 	set_alarm_active(not ALARM_ACTIVE)

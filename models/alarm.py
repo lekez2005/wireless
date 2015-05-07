@@ -8,18 +8,19 @@ import pi
 import sys
 
 sys.path.insert(0, '../')
-from app import db
+from app import db, transmit_message
 
 from device import Devices
 from encoder import Encoder
 
-#db = SQLAlchemy()
+# db = SQLAlchemy()
 
 IDENTIFIER = 'identifier'
 PRETTY_NAME = 'pretty_name'
 DESCRIPTION = 'description'
 ADDRESS = 'address'
 ACTIVE = 'active'
+DETECTORS = "detectors"
 
 
 class Alarm(db.Model):
@@ -42,15 +43,17 @@ class Alarm(db.Model):
 	@classmethod
 	def load_to_dict(cls, modules):
 		try:
-			alarms = cls.query.filter_by(active=True).all()
+			alarms = cls.query.all()
 			if alarms is not None:
 				modules[Devices.ALARM] = []
 				for al in alarms:
-					modules[Devices.ALARM].append((al.identifier, al.pretty_name))
+					a = {IDENTIFIER: al.identifier, PRETTY_NAME: al.pretty_name,
+						 DESCRIPTION: al.description, ADDRESS: al.address,
+						 DETECTORS: [det.identifier for det in al.detectors],
+						 ACTIVE: al.active}
+					modules[Devices.ALARM].append(a)
 		except Exception, e:
 			print e
-
-
 
 
 	def __repr__(self):
@@ -66,18 +69,25 @@ class Alarm(db.Model):
 			return pi.a_two
 
 	def ring(self, force=False):
+		db.session.refresh(self)
 		if self.active or force:
 			if self.get_pi() is not None:
 				self.get_pi().ring()
+			elif self.address is not None:
+				transmit_message(self.address, Devices.ALARM + "#%s#ring"%self.identifier)
 
 	def stop(self):
 		if self.get_pi() is not None:
 			self.get_pi().stop_ring()
+		elif self.address is not None:
+			transmit_message(self.address, Devices.ALARM + "#%s#stop"%self.identifier)
 
 
 class JsonEncoder(Encoder):
 	def default(self, o):
-		if not isinstance(o, Alarm):
+		from detector import Detector
+
+		if not (isinstance(o, Alarm) or isinstance(o, Detector)):
 			return super(JsonEncoder, self).default(o)
 		return o.__dict__
 
@@ -90,7 +100,9 @@ def add_commit(item):
 		print e.message
 		db.session.rollback()
 
+
 alarm_blueprint = Blueprint('alarm', __name__)
+
 
 @alarm_blueprint.route('/', methods=['GET'])
 @requires_auth
@@ -98,21 +110,22 @@ def get_all():
 	all = Alarm.query.all()
 	resp = {}
 
-	resp['alarms'] = [{IDENTIFIER:a.identifier,
-			 PRETTY_NAME: a.pretty_name,
-			 DESCRIPTION: a.description,
-			 ACTIVE: a.active} for a in all]
+	resp['alarms'] = [{IDENTIFIER: a.identifier,
+					   PRETTY_NAME: a.pretty_name,
+					   DESCRIPTION: a.description,
+					   ACTIVE: a.active} for a in all]
 	resp['Status'] = 'OK'
 	return jsonify(resp)
+
 
 @alarm_blueprint.route('/<identifier>')
 @requires_auth
 def get_alarm(identifier):
 	a = Alarm.query.get_or_404(identifier)
-	resp = json.loads(json.dumps(a, cls=JsonEncoder))
-	resp['Status'] = 'OK'
-	resp['detectors'] = [ [det.identifier, det.pretty_name]  for det in a.detectors]
-	return jsonify(resp)
+	al = {IDENTIFIER: a.identifier, PRETTY_NAME: a.pretty_name, DESCRIPTION: a.description, ADDRESS: a.address,
+		  ACTIVE: a.active, 'Status': 'OK'}
+	return jsonify(al)
+
 
 @alarm_blueprint.route('/update', methods=['POST'])
 @requires_auth
@@ -127,8 +140,16 @@ def update_alarm():
 		al.description = data.get('description')
 	if data.get('address') is not None:
 		al.address = data.get('address')
-	add_commit(al)
-	return jsonify({'Status': 'OK'})
+	try:
+		db.session.add(al)
+		db.session.commit()
+		return jsonify({'Status': 'OK'})
+	except Exception, e:
+		db.session.rollback()
+		return jsonify({'Status': 'ERROR', 'error': e.message})
+
+
+
 
 @alarm_blueprint.route('/ring/<identifier>', methods=['GET'])
 @requires_auth
@@ -136,6 +157,7 @@ def ring_alarm(identifier):
 	a = Alarm.query.get_or_404(identifier)
 	a.ring(True)
 	return jsonify({'Status': 'OK'})
+
 
 @alarm_blueprint.route('/stop/<identifier>', methods=['GET'])
 @requires_auth
@@ -149,6 +171,7 @@ def stop_alarm(identifier):
 @requires_auth
 def add_detector():
 	from detector import Detector
+
 	data = request.get_json(force=True)
 	a = Alarm.query.get_or_404(data.get('identifier'))
 	a.detectors.append(Detector.query.get_or_404(data.get('detector')))
@@ -160,6 +183,7 @@ def add_detector():
 @requires_auth
 def remove_detector():
 	from detector import Detector
+
 	data = request.get_json(force=True)
 	a = Alarm.query.get_or_404(data.get('identifier'))
 	d = Detector.query.get_or_404(data.get('detector'))

@@ -25,4 +25,4 @@ def load_modules():
 	from door import Door
 	Door.load_to_dict(modules)
 
-	return json.dumps(modules, cls=encoder.Encoder)
+	return modules

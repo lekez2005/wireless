@@ -1,6 +1,6 @@
 __author__ = 'lekez2005'
 
-import os
+import os, json
 
 import flask
 from xbee.python2to3 import intToByte, stringToBytes
@@ -33,8 +33,11 @@ def index():
 
 
 @app.route('/modules', methods=['GET'])
+@requires_auth
 def get_modules():
-	return load_modules()
+	modules = load_modules()
+	modules['activated'] = pi.is_activated()
+	return flask.jsonify(modules)
 
 @app.route('/activate', methods=['POST'])
 @requires_auth
@@ -99,7 +102,7 @@ def start_server(regenerate=False):
 	app.register_blueprint(detector_blueprint, url_prefix='/detector')
 	app.register_blueprint(user_blueprint, url_prefix='/user')
 
-	print get_modules()
+	print json.dumps(load_modules(), sort_keys=True, indent=4, separators=(',', ': '))
 
 
 

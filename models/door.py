@@ -11,6 +11,13 @@ from encoder import Encoder
 sys.path.insert(0, '../')
 from app import db, transmit_message
 
+IDENTIFIER = 'identifier'
+PRETTY_NAME = 'pretty_name'
+DESCRIPTION = 'description'
+ADDRESS = 'address'
+ACTIVE = 'active'
+
+
 class Door(db.Model):
 	identifier = db.Column(db.String, primary_key=True)
 	pretty_name = db.Column(db.String(50))
@@ -43,7 +50,10 @@ class Door(db.Model):
 			if doors is not None:
 				modules[Devices.DOOR] = []
 				for d in doors:
-					modules[Devices.DOOR].append((d.identifier, d.pretty_name))
+					do = {IDENTIFIER: d.identifier, PRETTY_NAME: d.pretty_name,
+						  DESCRIPTION:d.description, ADDRESS: d.address,
+						  ACTIVE: d.active}
+					modules[Devices.DOOR].append(do)
 		except Exception, e:
 			print e
 
@@ -51,10 +61,17 @@ class Door(db.Model):
 		pass
 
 	def unlock(self):
-		transmit_message(self.address, Devices.DOOR + "#%s#unlock"%self.identifier)
+		if self.address is not None:
+			transmit_message(self.address, Devices.DOOR + "#%s#unlock"%self.identifier)
+			return True
+		return False
 
 	def lock(self):
-		transmit_message(self.address, Devices.DOOR + "#%s#lock"%self.identifier)
+		if self.address is not None:
+			transmit_message(self.address, Devices.DOOR + "#%s#lock"%self.identifier)
+			return True
+		else:
+			return False
 
 class JsonEncoder(Encoder):
 	def default(self, o):
@@ -97,15 +114,17 @@ def get_door(identifier):
 @requires_auth
 def unlock_door(identifier):
 	d = Door.query.get_or_404(identifier)
-	d.unlock()
-	return jsonify({'Status': 'OK'})
+	if d.unlock():
+		return jsonify({'Status': 'OK'})
+	return jsonify({'Status': 'ERROR', 'error': 'No address'})
 
 @door_blueprint.route('/lock/<identifier>')
 @requires_auth
 def lock_door(identifier):
 	d = Door.query.get_or_404(identifier)
-	d.lock()
-	return jsonify({'Status': 'OK'})
+	if d.lock():
+		return jsonify({'Status': 'OK'})
+	return jsonify({'Status': 'ERROR', 'error': 'No address'})
 
 @door_blueprint.route('/update', methods=['POST'])
 @requires_auth
@@ -121,6 +140,12 @@ def update_door():
 		d.address = data.get('address')
 	if 'active' in data:
 		d.active = data.get('active')
+	if 'rfid' in data:
+		try:
+			rf = Rfid.query.get(data.get('rfid'))
+			d.rfid = rf
+		except Exception:
+			pass
 	db.session.add(d)
 	db.session.commit()
 	return jsonify({'Status': 'OK'})

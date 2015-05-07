@@ -11,6 +11,13 @@ from authenticate import requires_auth
 
 from device import Devices
 
+IDENTIFIER = 'identifier'
+PRETTY_NAME = 'pretty_name'
+DESCRIPTION = 'description'
+ADDRESS = 'address'
+ACTIVE = 'active'
+
+
 class Rfid(db.Model):
 	identifier = db.Column(db.String(50), primary_key=True)
 	pretty_name = db.Column(db.String(50))
@@ -60,7 +67,10 @@ class Rfid(db.Model):
 			if rfids is not None:
 				modules[Devices.RFID] = []
 				for rf in rfids:
-					modules[Devices.RFID].append((rf.identifier, rf.pretty_name))
+					r = {IDENTIFIER: rf.identifier, PRETTY_NAME: rf.pretty_name,
+						 DESCRIPTION: rf.description, ACTIVE: rf.active,
+						 ADDRESS: rf.address}
+					modules[Devices.RFID].append(r)
 		except Exception, e:
 			print e
 
